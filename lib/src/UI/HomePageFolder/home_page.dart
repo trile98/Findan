@@ -2,23 +2,32 @@
 import 'dart:async';
 import 'dart:isolate';
 
+import 'package:findan/src/BLOC/searchService.dart';
 import 'package:findan/src/BLOC/search_bloc.dart';
+import 'package:findan/src/Repository/Models/messageDto.dart';
+import 'package:findan/src/Repository/Models/novel_info.dart';
+import 'package:findan/src/ValueFolder/custom_enums.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:flutter_isolate/flutter_isolate.dart';
 
 import 'home_options_radio.dart';
 
 class HomePage extends StatelessWidget{
+  const HomePage({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
-    return HomeSearch();
+    return const HomeSearch();
   }
 
 }
 
 
+
 class HomeSearch extends StatefulWidget {
-  HomeSearch({Key? key}) : super(key: key);
+  const HomeSearch({Key? key}) : super(key: key);
 
   @override
   HomeSearchState createState() => HomeSearchState();
@@ -27,34 +36,39 @@ class HomeSearch extends StatefulWidget {
 
 class HomeSearchState extends State<HomeSearch> with SingleTickerProviderStateMixin{
 
-   static void testIsolate(SendPort sendPort)async{
-     var port = new ReceivePort();
-     var a = 10;
+  static void searchIsolate(Map<String, Object> map)async{
 
-     sendPort.send(port.sendPort);
-      var item = await port.first;
+    await Firebase.initializeApp();
 
-      print(item["typeSearch"]);
+    SendPort sendPort = map["sendport"] as SendPort;
+    try {
 
-    var total = 0;
-    for(int i= 0 ; i<= a; i++){
-      total+= i;
+      var item = map["content"] as Map;
 
-      print(i);
+      var keyword = item["keyword"];
+      var type = item["typeSearch"];
+
+      SearchService service = SearchService();
+
+      MessageDto messageDto = await service.getListOfNovel(keyword, type);
+
+      if(messageDto.messageCode == 1)
+        sendPort.send({"message": messageDto.messageCode,"err":"","list":messageDto.attachedObject});
+      else
+        sendPort.send({"message": messageDto.messageCode,"err":messageDto.message,"list":""});
+
+    }on Exception catch( e){
+      sendPort.send({"message": 0,"err":e.toString()});
     }
-    Future.delayed(new Duration(seconds: 10));
-    print("${total} test total");
 
-    var contx = item["context"] as BuildContext;
-
-    Navigator.pop(contx);
   }
+
 
   var radioLayout = HomeOptionsRadio();
 
-  SearchBLOC searchBLOC = new SearchBLOC();
+  SearchBLOC searchBLOC = SearchBLOC();
 
-  TextEditingController searchControler = new TextEditingController();
+  TextEditingController searchControler = TextEditingController();
 
   late AnimationController homeSearchAnimController;
   late Animation<Offset> offSetAnim;
@@ -63,13 +77,24 @@ class HomeSearchState extends State<HomeSearch> with SingleTickerProviderStateMi
 
   var mainColumn = <Widget>[];
 
+
+  @override
+  void dispose() {
+    searchBLOC.dispose();
+    super.dispose();
+  }
+
   void setUpMainContent(){
     Widget searchWidget =
         SlideTransition(
             position: offSetAnim,
             child: StreamBuilder(
               stream: searchBLOC.searchInputStream,
-              builder: (streamBuildercontext,snapshot)=>  Center(
+              builder: (streamBuildercontext,snapshot)
+              {
+
+
+                return Center(
                 child: Padding(
                   child: Row(
                     children: <Widget>[
@@ -79,7 +104,8 @@ class HomeSearchState extends State<HomeSearch> with SingleTickerProviderStateMi
                             keyboardType: TextInputType.multiline,
                             controller: searchControler,
                             decoration: InputDecoration(
-                              errorText: snapshot.hasError ? snapshot.error.toString() : null
+                                errorText: snapshot.hasError ? snapshot.error
+                                    .toString() : null
                             ),
                             maxLines: 3,
                             minLines: 1,
@@ -90,7 +116,7 @@ class HomeSearchState extends State<HomeSearch> with SingleTickerProviderStateMi
                         icon: const Icon(Icons.search),
 
                         onPressed: () async {
-                          if(!searchBLOC.isSearchNull(searchControler.text)){
+                          if (!searchBLOC.isSearchNull(searchControler.text)) {
                             print("run dialog");
                             showLoadingDialog(streamBuildercontext);
                           }
@@ -100,7 +126,8 @@ class HomeSearchState extends State<HomeSearch> with SingleTickerProviderStateMi
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 15.0),
                 ),
-              )
+              );
+              }
             )
         );
 
@@ -148,6 +175,7 @@ class HomeSearchState extends State<HomeSearch> with SingleTickerProviderStateMi
 
   void showLoadingDialog(BuildContext bContext) async{
     showDialog(context: bContext, builder: (BuildContext dialogContext) {
+
       return const SimpleDialog(
         title: Text("Dang tim kiem"),
         children: [
@@ -158,21 +186,52 @@ class HomeSearchState extends State<HomeSearch> with SingleTickerProviderStateMi
 
 
     ReceivePort receivePort = new ReceivePort();
-    var isolate = await Isolate.spawn(testIsolate, receivePort.sendPort);
+     await FlutterIsolate.spawn(searchIsolate, {"content":{"keyword":searchControler.text, "typeSearch":(radioLayout.selectedValue as SearchOptionsEnum).name, "a":100},"sendport":receivePort.sendPort});
+
+    var receiveItem = await receivePort.first;
+
+    if((receiveItem["message"] as int) == 1){
+      Navigator.of(bContext).pop();
+      var l = (receiveItem["list"] as Map<String,dynamic>);
+
+      List<NovelInfo> result = [];
+
+      for(var i in l.entries){
+        result.add(NovelInfo.fromJson(i.value));
+
+      }
 
 
-       //   if(message == "finished") //means completed
-       // var check = await sendPort;
-       // print("${check} checksendport");
-
-    SendPort sendPort = await receivePort.first;
-    sendPort.send({"keyword":searchControler.text, "typeSearch":radioLayout.selectedValue, "a":100, "context":bContext});
-
+    }
 
    /* });*/
   }
 
 
+  // static void testIsolate(Map<String, Object> map)async{
+  //   SendPort sendPort = map["sendport"] as SendPort;
+  //   try {
+  //
+  //
+  //     var a = 10;
+  //     var item = map["content"] as Map;
+  //
+  //     print(item["typeSearch"]);
+  //
+  //     var total = 0;
+  //     for (int i = 0; i <= a; i++) {
+  //       total += i;
+  //
+  //       print(i);
+  //     }
+  //     Future.delayed(new Duration(seconds: 10));
+  //
+  //     sendPort.send({"message": "finish","err":""});
+  //   }on Exception catch( e){
+  //     sendPort.send({"message": "fail","err":e.toString()});
+  //   }
+  //
+  // }
 }
 
 

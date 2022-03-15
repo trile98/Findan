@@ -8,4 +8,15 @@ class NovelNameInfo{
   int get getId =>  id;
   List<Object?> get getLink => link;
   String get getName => name;
+
+  Map<String, dynamic> toJson() => {
+    "id": id,
+    "link": link,
+    "name" : name
+  };
+
+  NovelNameInfo.fromJson(Map<String,dynamic> js):
+      id = js["id"],
+      link = js["link"],
+      name = js["name"];
 }
