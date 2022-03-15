@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/findan.iml" filepath="$PROJECT_DIR$/findan.iml" />
-      <module fileurl="file://$PROJECT_DIR$/android/findan_android.iml" filepath="$PROJECT_DIR$/android/findan_android.iml" />
     </modules>
   </component>
 </project>
