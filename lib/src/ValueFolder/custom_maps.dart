@@ -11,4 +11,9 @@ class CustomMaps{
     static const messageMap = {
         "searchNullInvalidMessage": "nội dung tìm kiếm vẫn trống! Vui lòng nhập thông tin muốn tìm kiếm"
     };
+
+    static const colorMap = {
+        "themeColor" : 0xFFAFC3AB,
+        "buttonThemeColor" : 0xFFBFCFBB
+    };
 }
